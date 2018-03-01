@@ -43,8 +43,18 @@ using apollo::common::VehicleState;
 using apollo::common::VehicleStateProvider;
 using apollo::common::adapter::AdapterManager;
 using apollo::common::time::Clock;
+using apollo::hdmap::HDMapUtil;
 
 std::string Planning::Name() const { return "planning"; }
+
+#define CHECK_ADAPTER(NAME)                                              \
+  if (AdapterManager::Get##NAME() == nullptr) {                          \
+    AERROR << #NAME << " is not registered";                             \
+    return Status(ErrorCode::PLANNING_ERROR, #NAME " is not registerd"); \
+  }
+
+#define CHECK_ADAPTER_IF(CONDITION, NAME) \
+  if (CONDITION) CHECK_ADAPTER(NAME)
 
 void Planning::RegisterPlanners() {
   planner_factory_.Register(
@@ -70,9 +80,6 @@ Status Planning::InitFrame(const uint32_t sequence_num,
 }
 
 Status Planning::Init() {
-  hdmap_ = apollo::hdmap::HDMapUtil::BaseMapPtr();
-  CHECK(hdmap_) << "Failed to load map file:" << apollo::hdmap::BaseMapFile();
-
   CHECK(apollo::common::util::GetProtoFromFile(FLAGS_planning_config_file,
                                                &config_))
       << "failed to load planning config file " << FLAGS_planning_config_file;
@@ -83,45 +90,22 @@ Status Planning::Init() {
   if (!AdapterManager::Initialized()) {
     AdapterManager::Init(FLAGS_planning_adapter_config_filename);
   }
-  if (AdapterManager::GetLocalization() == nullptr) {
-    std::string error_msg("Localization is not registered");
-    AERROR << error_msg;
-    return Status(ErrorCode::PLANNING_ERROR, error_msg);
+  CHECK_ADAPTER(Localization);
+  CHECK_ADAPTER(Chassis);
+  CHECK_ADAPTER(RoutingResponse);
+  CHECK_ADAPTER(RoutingRequest);
+  CHECK_ADAPTER_IF(FLAGS_use_navigation_mode, RelativeMap);
+  CHECK_ADAPTER_IF(FLAGS_use_navigation_mode && FLAGS_enable_prediction,
+                   PerceptionObstacles);
+  CHECK_ADAPTER_IF(FLAGS_enable_prediction, Prediction);
+  CHECK_ADAPTER_IF(FLAGS_enable_traffic_light, TrafficLightDetection);
+
+  if (!FLAGS_use_navigation_mode) {
+    hdmap_ = HDMapUtil::BaseMapPtr();
+    CHECK(hdmap_) << "Failed to load map";
+    reference_line_provider_ = std::unique_ptr<ReferenceLineProvider>(
+        new ReferenceLineProvider(hdmap_, config_.smoother_type()));
   }
-  if (AdapterManager::GetChassis() == nullptr) {
-    std::string error_msg("Chassis is not registered");
-    AERROR << error_msg;
-    return Status(ErrorCode::PLANNING_ERROR, error_msg);
-  }
-  if (AdapterManager::GetRoutingResponse() == nullptr) {
-    std::string error_msg("RoutingResponse is not registered");
-    AERROR << error_msg;
-    return Status(ErrorCode::PLANNING_ERROR, error_msg);
-  }
-  if (AdapterManager::GetRoutingRequest() == nullptr) {
-    std::string error_msg("RoutingRequest is not registered");
-    AERROR << error_msg;
-    return Status(ErrorCode::PLANNING_ERROR, error_msg);
-  }
-  if (FLAGS_use_navigation_mode && FLAGS_enable_prediction &&
-      AdapterManager::GetPerceptionObstacles() == nullptr) {
-    std::string error_msg("Perception is not registered");
-    AERROR << error_msg;
-    return Status(ErrorCode::PLANNING_ERROR, error_msg);
-  }
-  if (FLAGS_enable_prediction && AdapterManager::GetPrediction() == nullptr) {
-    std::string error_msg("Enabled prediction, but no prediction is observed.");
-    AERROR << error_msg;
-    return Status(ErrorCode::PLANNING_ERROR, error_msg);
-  }
-  if (FLAGS_enable_traffic_light &&
-      AdapterManager::GetTrafficLightDetection() == nullptr) {
-    std::string error_msg("Traffic Light Detection is not registered");
-    AERROR << error_msg;
-    return Status(ErrorCode::PLANNING_ERROR, error_msg);
-  }
-  reference_line_provider_ = std::unique_ptr<ReferenceLineProvider>(
-      new ReferenceLineProvider(hdmap_, config_.smoother_type()));
 
   RegisterPlanners();
   planner_ = planner_factory_.CreateObject(config_.planner_type());
@@ -189,10 +173,10 @@ void Planning::PublishPlanningPb(ADCTrajectory* trajectory_pb,
 }
 
 void Planning::RunOnce() {
-  const double start_timestamp = Clock::NowInSeconds();
-
   // snapshot all coming data
   AdapterManager::Observe();
+
+  const double start_timestamp = Clock::NowInSeconds();
 
   ADCTrajectory not_ready_pb;
   auto* not_ready = not_ready_pb.mutable_decision()
@@ -202,13 +186,23 @@ void Planning::RunOnce() {
     not_ready->set_reason("localization not ready");
   } else if (AdapterManager::GetChassis()->Empty()) {
     not_ready->set_reason("chassis not ready");
-  } else if (AdapterManager::GetRoutingResponse()->Empty()) {
+  } else if (!FLAGS_use_navigation_mode &&
+             AdapterManager::GetRoutingResponse()->Empty()) {
     not_ready->set_reason("routing not ready");
+  } else if (HDMapUtil::BaseMapPtr() == nullptr) {
+    not_ready->set_reason("map not ready");
   }
   if (not_ready->has_reason()) {
     AERROR << not_ready->reason() << "; skip the planning cycle.";
     PublishPlanningPb(&not_ready_pb, start_timestamp);
     return;
+  }
+
+  if (FLAGS_use_navigation_mode) {
+    // recreate reference line provider in every cycle
+    hdmap_ = HDMapUtil::BaseMapPtr();
+    reference_line_provider_ = std::unique_ptr<ReferenceLineProvider>(
+        new ReferenceLineProvider(hdmap_, config_.smoother_type()));
   }
 
   // localization
@@ -248,7 +242,8 @@ void Planning::RunOnce() {
     return;
   }
 
-  if (!reference_line_provider_->UpdateRoutingResponse(
+  if (!FLAGS_use_navigation_mode &&
+      !reference_line_provider_->UpdateRoutingResponse(
           AdapterManager::GetRoutingResponse()->GetLatestObserved())) {
     std::string msg("Failed to update routing in reference line provider");
     AERROR << msg;
@@ -263,7 +258,9 @@ void Planning::RunOnce() {
   }
 
   // Update reference line provider
-  reference_line_provider_->UpdateVehicleState(vehicle_state);
+  if (!FLAGS_use_navigation_mode) {
+    reference_line_provider_->UpdateVehicleState(vehicle_state);
+  }
 
   const double planning_cycle_time = 1.0 / FLAGS_planning_loop_rate;
   bool is_replan = false;
@@ -293,10 +290,16 @@ void Planning::RunOnce() {
     std::string msg("Failed to init frame");
     AERROR << msg;
     if (FLAGS_publish_estop) {
-      ADCTrajectory estop;
-      estop.mutable_estop();
-      status.Save(estop.mutable_header()->mutable_status());
-      PublishPlanningPb(&estop, start_timestamp);
+      // Because the function "Control::ProduceControlCommand()" checks the
+      // "estop" signal with the following line (Line 170 in control.cc):
+      // estop_ = estop_ || trajectory_.estop().is_estop();
+      // we should add more information to ensure the estop being triggered.
+      ADCTrajectory estop_trajectory;
+      EStop* estop = estop_trajectory.mutable_estop();
+      estop->set_is_estop(true);
+      estop->set_reason(status.error_message());
+      status.Save(estop_trajectory.mutable_header()->mutable_status());
+      PublishPlanningPb(&estop_trajectory, start_timestamp);
     } else {
       not_ready->set_reason(msg);
       status.Save(not_ready_pb.mutable_header()->mutable_status());
@@ -329,7 +332,13 @@ void Planning::RunOnce() {
     AERROR << "Planning failed:" << status.ToString();
     if (FLAGS_publish_estop) {
       AERROR << "Planning failed and set estop";
-      trajectory_pb->mutable_estop();
+      // Because the function "Control::ProduceControlCommand()" checks the
+      // "estop" signal with the following line (Line 170 in control.cc):
+      // estop_ = estop_ || trajectory_.estop().is_estop();
+      // we should add more information to ensure the estop being triggered.
+      EStop* estop = trajectory_pb->mutable_estop();
+      estop->set_is_estop(true);
+      estop->set_reason(status.error_message());
     }
   }
 
@@ -339,7 +348,7 @@ void Planning::RunOnce() {
 
   auto seq_num = frame_->SequenceNum();
   FrameHistory::instance()->Add(seq_num, std::move(frame_));
-}
+}  // namespace planning
 
 void Planning::Stop() {
   AERROR << "Planning Stop is called";

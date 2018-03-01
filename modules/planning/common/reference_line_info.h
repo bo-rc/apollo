@@ -30,7 +30,7 @@
 
 #include "modules/common/proto/drive_state.pb.h"
 #include "modules/common/proto/pnc_point.pb.h"
-#include "modules/common/proto/vehicle_state.pb.h"
+#include "modules/common/vehicle_state/proto/vehicle_state.pb.h"
 #include "modules/planning/proto/planning.pb.h"
 
 #include "modules/map/pnc_map/pnc_map.h"
@@ -161,7 +161,7 @@ class ReferenceLineInfo {
 
   bool is_inited_ = false;
 
-  bool is_drivable_ = false;
+  bool is_drivable_ = true;
 
   PathDecision path_decision_;
 
