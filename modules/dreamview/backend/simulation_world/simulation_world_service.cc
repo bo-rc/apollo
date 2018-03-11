@@ -58,6 +58,7 @@ using apollo::common::time::millis;
 using apollo::common::util::DownsampleByAngle;
 using apollo::common::util::GetProtoFromFile;
 using apollo::control::ControlCommand;
+using apollo::hdmap::Map;
 using apollo::hdmap::Path;
 using apollo::localization::Gps;
 using apollo::localization::LocalizationEstimate;
@@ -70,6 +71,7 @@ using apollo::planning::StopReasonCode;
 using apollo::planning_internal::PlanningData;
 using apollo::prediction::PredictionObstacle;
 using apollo::prediction::PredictionObstacles;
+using apollo::relative_map::MapMsg;
 using apollo::relative_map::NavigationInfo;
 using apollo::routing::RoutingResponse;
 
@@ -190,9 +192,7 @@ void UpdateTurnSignal(const apollo::common::VehicleSignal &signal,
   }
 }
 
-inline double SecToMs(const double sec) {
-  return sec * 1000.0;
-}
+inline double SecToMs(const double sec) { return sec * 1000.0; }
 
 }  // namespace
 
@@ -259,6 +259,8 @@ void SimulationWorldService::Update() {
   UpdateWithLatestObserved("ControlCommand",
                            AdapterManager::GetControlCommand());
   UpdateWithLatestObserved("Navigation", AdapterManager::GetNavigation());
+  UpdateWithLatestObserved("RelativeMap", AdapterManager::GetRelativeMap());
+
   for (const auto &kv : obj_map_) {
     *world_.add_object() = kv.second;
   }
@@ -281,6 +283,8 @@ void SimulationWorldService::UpdateDelays() {
       SecToMs(AdapterManager::GetPrediction()->GetDelaySec()));
   delays->set_traffic_light(
       SecToMs(AdapterManager::GetTrafficLightDetection()->GetDelaySec()));
+  delays->set_control(
+      SecToMs(AdapterManager::GetControlCommand()->GetDelaySec()));
 }
 
 void SimulationWorldService::GetWireFormatString(
@@ -321,6 +325,10 @@ void SimulationWorldService::PopulateMapInfo(double radius) {
   GetMapElementIds(radius, world_.mutable_map_element_ids());
   world_.set_map_hash(map_service_->CalculateMapHash(world_.map_element_ids()));
   world_.set_map_radius(radius);
+}
+
+const Map &SimulationWorldService::GetRelativeMap() const {
+  return relative_map_;
 }
 
 template <>
@@ -949,6 +957,20 @@ void SimulationWorldService::UpdateSimulationWorld(
   for (auto &navigation_path : navigation_info.navigation_path()) {
     if (navigation_path.has_path()) {
       DownsamplePath(navigation_path.path(), world_.add_navigation_path());
+    }
+  }
+}
+
+template <>
+void SimulationWorldService::UpdateSimulationWorld(const MapMsg &map_msg) {
+  if (map_msg.has_hdmap()) {
+    relative_map_.CopyFrom(map_msg.hdmap());
+    for (int i = 0; i < relative_map_.lane_size(); ++i) {
+      auto *lane = relative_map_.mutable_lane(i);
+      lane->clear_left_sample();
+      lane->clear_right_sample();
+      lane->clear_left_road_sample();
+      lane->clear_right_road_sample();
     }
   }
 }

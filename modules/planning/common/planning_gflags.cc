@@ -28,6 +28,10 @@ DEFINE_string(planning_adapter_config_filename,
               "modules/planning/conf/adapter.conf",
               "The adapter configuration file");
 
+DEFINE_string(traffic_rule_config_filename,
+              "modules/planning/conf/traffic_rule_config.pb.txt",
+              "Traffic rule config filename");
+
 DEFINE_string(smoother_config_filename,
               "modules/planning/conf/smoother_config.pb.txt",
               "The configuration file for qp sline smoother");
@@ -285,7 +289,7 @@ DEFINE_bool(enable_stop_sign_creeping, false,
             "or two way stop signs.");
 DEFINE_string(stop_sign_virtual_obstacle_id_prefix, "SS_",
               "prefix for converting stop_sign id to virtual obstacle id");
-DEFINE_double(stop_sign_stop_duration, 3.0,
+DEFINE_double(stop_sign_stop_duration, 1.0,
               "min time(second) to stop at stop sign");
 DEFINE_double(stop_sign_min_pass_distance, 3.0,
               "valid min distance(m) for vehicles to be considered as "
@@ -419,3 +423,11 @@ DEFINE_double(default_lon_buffer, 5.0,
               "Default longitudinal buffer to sample path-time points.");
 DEFINE_double(time_min_density, 1.0,
               "Minimal time density to search sample points.");
+DEFINE_double(comfort_acceleration_factor, 0.5,
+              "Factor for comfort acceleration.");
+DEFINE_double(polynomial_minimal_param, 0.01,
+              "Minimal time parameter in polynomials.");
+
+// navigation mode
+DEFINE_double(navigation_fallback_cruise_time, 8.0,
+              "The time range of fallback cruise under navigation mode.");

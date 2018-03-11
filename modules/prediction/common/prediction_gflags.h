@@ -78,15 +78,20 @@ DECLARE_double(rnn_min_lane_relatice_s);
 DECLARE_bool(enable_adjust_velocity_heading);
 DECLARE_double(heading_filter_param);
 
+// Cost evaluator
+DECLARE_double(cost_exp_coeff);
+
 // Obstacle trajectory
 DECLARE_double(lane_sequence_threshold);
 DECLARE_double(lane_change_dist);
 DECLARE_bool(enable_lane_sequence_acc);
 DECLARE_bool(enable_trim_prediction_trajectory);
+DECLARE_bool(enable_trajectory_validation_check);
 DECLARE_double(distance_beyond_junction);
 DECLARE_double(adc_trajectory_search_length);
 DECLARE_double(virtual_lane_radius);
 DECLARE_double(default_lateral_approach_speed);
+DECLARE_double(centripedal_acc_threshold);
 
 // move sequence prediction
 DECLARE_double(time_upper_bound_to_lane_center);

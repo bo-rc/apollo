@@ -14,20 +14,20 @@
  * limitations under the License.
  *****************************************************************************/
 
-#ifndef MODULES_PERCEPTION_OBSTACLE_CAMERA_COMMON_UTIL_H
-#define MODULES_PERCEPTION_OBSTACLE_CAMERA_COMMON_UTIL_H
+#ifndef MODULES_PERCEPTION_OBSTACLE_CAMERA_COMMON_UTIL_H_
+#define MODULES_PERCEPTION_OBSTACLE_CAMERA_COMMON_UTIL_H_
 
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/io/gzip_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/text_format.h>
-#include <opencv2/opencv.hpp>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <string>
 #include <vector>
 
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/io/gzip_stream.h"
+#include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "google/protobuf/text_format.h"
+#include "opencv2/opencv.hpp"
 
 #include "modules/perception/obstacle/camera/common/visual_object.h"
 
@@ -47,14 +47,12 @@ const cv::Scalar COLOR_BLACK = cv::Scalar(0, 0, 0);
 class Timer {
  public:
   Timer() {
-    _scale = 1.0 / (static_cast<double>(cvGetTickFrequency()) * 1000.);
+    scale_ = 1.0 / (static_cast<double>(cvGetTickFrequency()) * 1000.);
     tic();
   }
-  void tic() {
-    _start = static_cast<double>(cv::getTickCount());
-  }
+  void tic() { start_ = static_cast<double>(cv::getTickCount()); }
   double toc(bool reset = false) {
-    double time = (static_cast<double>(cvGetTickCount()) - _start) * _scale;
+    double time = (static_cast<double>(cvGetTickCount()) - start_) * scale_;
     if (reset) {
       tic();
     }
@@ -62,8 +60,8 @@ class Timer {
   }
 
  private:
-  double _start;
-  double _scale;
+  double start_ = 0.0;
+  double scale_ = 0.0;
 };
 
 inline void l2norm(float *feat_data, int feat_dim) {
@@ -88,20 +86,20 @@ inline void l2norm(float *feat_data, int feat_dim) {
   }
 }
 
-bool load_visual_object_form_file(const std::string &file_name,
+bool LoadVisualObjectFromFile(const std::string &file_name,
                                   std::vector<VisualObjectPtr> *visual_objects);
 
-bool write_visual_object_to_file(const std::string &file_name,
+bool WriteVisualObjectToFile(const std::string &file_name,
                                  std::vector<VisualObjectPtr> *visual_objects);
 
-bool load_gt_form_file(const std::string &gt_path,
+bool LoadGTfromFile(const std::string &gt_path,
                        std::vector<VisualObjectPtr> *visual_objects);
 
-std::string get_type_text(ObjectType type);
+std::string GetTypeText(ObjectType type);
 
-ObjectType get_object_type(const std::string &type_text);
+ObjectType GetObjectType(const std::string &type_text);
 
 }  // namespace perception
 }  // namespace apollo
 
-#endif  // MODULES_PERCEPTION_OBSTACLE_CAMERA_COMMON_UTIL_H
+#endif  // MODULES_PERCEPTION_OBSTACLE_CAMERA_COMMON_UTIL_H_

@@ -105,6 +105,10 @@ DEFINE_bool(enable_adjust_velocity_heading, false,
             "adjust velocity heading to lane heading");
 DEFINE_double(heading_filter_param, 0.99, "heading filter parameter");
 
+// Cost evaluator
+DEFINE_double(cost_exp_coeff, 1.5,
+              "Coefficient of the exponential term in cost evaluator.");
+
 // Obstacle trajectory
 DEFINE_double(lane_sequence_threshold, 0.5,
               "Threshold for trimming lane sequence trajectories");
@@ -114,6 +118,8 @@ DEFINE_bool(enable_lane_sequence_acc, false,
 DEFINE_bool(enable_trim_prediction_trajectory, false,
             "If trim the prediction trajectory to avoid crossing"
             "protected adc planning trajectory.");
+DEFINE_bool(enable_trajectory_validation_check, false,
+            "If check the validity of prediction trajectory.");
 DEFINE_double(distance_beyond_junction, 0.5,
               "If the obstacle is in junction more than this threshold,"
               "consider it in junction.");
@@ -122,6 +128,8 @@ DEFINE_double(adc_trajectory_search_length, 10.0,
 DEFINE_double(virtual_lane_radius, 0.5, "Radius to search virtual lanes");
 DEFINE_double(default_lateral_approach_speed, 0.5,
               "Default lateral speed approaching to center of lane");
+DEFINE_double(centripedal_acc_threshold, 2.0,
+              "Threshold of centripedal acceleration.");
 
 // move sequence prediction
 DEFINE_double(time_upper_bound_to_lane_center, 5.0,

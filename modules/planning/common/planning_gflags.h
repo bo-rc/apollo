@@ -24,6 +24,7 @@ DECLARE_double(test_duration);
 
 DECLARE_string(planning_config_file);
 DECLARE_string(planning_adapter_config_filename);
+DECLARE_string(traffic_rule_config_filename);
 DECLARE_string(smoother_config_filename);
 DECLARE_int32(planning_loop_rate);
 DECLARE_string(rtk_trajectory_filename);
@@ -219,5 +220,10 @@ DECLARE_double(lon_collision_overtake_buffer);
 DECLARE_double(lon_collision_cost_std);
 DECLARE_double(default_lon_buffer);
 DECLARE_double(time_min_density);
+DECLARE_double(comfort_acceleration_factor);
+DECLARE_double(polynomial_minimal_param);
 
-#endif  // MODULES_PLANNING_COMMON_PLANNING_GFLAGS_H
+// navigation mode
+DECLARE_double(navigation_fallback_cruise_time);
+
+#endif  // MODULES_PLANNING_COMMON_PLANNING_GFLAGS_H_

@@ -41,7 +41,8 @@ using apollo::common::util::WithinBound;
 using apollo::perception::TrafficLight;
 using apollo::perception::TrafficLightDetection;
 
-SignalLight::SignalLight(const RuleConfig& config) : TrafficRule(config) {}
+SignalLight::SignalLight(const TrafficRuleConfig& config)
+    : TrafficRule(config) {}
 
 bool SignalLight::ApplyRule(Frame* const frame,
                             ReferenceLineInfo* const reference_line_info) {
@@ -215,7 +216,12 @@ bool SignalLight::BuildStopDecision(
 
   ObjectDecisionType stop;
   auto stop_decision = stop.mutable_stop();
-  stop_decision->set_reason_code(StopReasonCode::STOP_REASON_SIGNAL);
+  auto signal_color = GetSignal(signal_light->object_id).color();
+  if (signal_color == TrafficLight::YELLOW) {
+    stop_decision->set_reason_code(StopReasonCode::STOP_REASON_YELLOW_SIGNAL);
+  } else {
+    stop_decision->set_reason_code(StopReasonCode::STOP_REASON_SIGNAL);
+  }
   stop_decision->set_distance_s(-FLAGS_traffic_light_stop_distance);
   stop_decision->set_stop_heading(stop_heading);
   stop_decision->mutable_stop_point()->set_x(stop_point.x());
@@ -232,7 +238,7 @@ bool SignalLight::BuildStopDecision(
   }
 
   path_decision->AddLongitudinalDecision(
-      RuleConfig::RuleId_Name(config_.rule_id()), stop_wall->Id(), stop);
+      TrafficRuleConfig::RuleId_Name(config_.rule_id()), stop_wall->Id(), stop);
 
   return true;
 }
